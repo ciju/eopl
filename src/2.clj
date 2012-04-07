@@ -196,19 +196,306 @@
 ;; (apply-env (extend-env* '(x y n) '(1 2 3) test-binding) 'd)
 
 ;; ex: 2.12
-(defn empty-stack
-  (fn [] '()))
-(defn push [x stack]
-  (fn []
-    (list 'push x stack)))
-(defn pop
-  (fn []
-    (list 'pop stack)))
-(defn top
-  (list 'top stack))
-(defn empty-stack?
-  (
+
+(defn empty-stack []
+  (fn [op]
+    (if (= op 'empty-stack?)
+      true
+      (throw (IllegalArgumentException.)))))
+
+(defn spush [x stack]
+  (fn [op]
+    (case op
+      'empty-stack? false
+      'top x
+      'pop stack
+      :else (throw (IllegalArgumentException.)))))
 
 
-(run-tests)
+(defn empty-stack? [stack]
+  (stack 'empty-stack?))
+
+(defn spop [stack]
+  (stack 'pop))
+
+(defn stop [stack]
+  (stack 'top))
+
+
+;;; ex: 2.13
+(defn empty-env []
+  [ (fn [search-var]
+      (throw (Exception.)))
+    (fn [] true)])
+
+(defn extend-env [saved-var saved-val saved-env]
+  [ (fn [search-var]
+      (if (= search-var saved-var)
+        saved-val
+        (apply-env saved-env search-var)))
+    (fn [] false)])
+
+(defn apply-env [env search-var]
+  ((first env) search-var))
+
+(defn empty-env? [env]
+  ((second env)))
+
+
+;;; ex: 2.14
+
+(defn empty-env []
+  [ (fn [search-var]
+      (throw (Exception.)))
+    (fn [search-var] false)
+    (fn [] true)])
+
+(defn extend-env [saved-var saved-val saved-env]
+  (defn apply-op [op op-res]
+    (fn [search-var]
+      (if (= search-var saved-var)
+        (op-res saved-val)
+        (op saved-env search-var))))
+  
+  [ (apply-op apply-env (fn [val] val))
+    (apply-op has-binding? (fn [val] true))
+    (fn [] false)])
+
+(defn apply-env [[apply & _] search-var]
+  (apply search-var))
+
+(defn has-binding? [[_ binding? _] search-var]
+  (binding? search-var))
+
+(defn empty-env? [[_ _ efn]] ( efn))
+
+
+;;; ex: 2.15
+(defn var-exp [var] var)
+(defn lambda-exp [var exp]
+  (list 'lambda (list var) exp))
+(defn app-exp [exp1 exp2]
+  (list exp1 exp2))
+
+(defn var-exp? [exp]
+  (symbol? exp))
+(defn lambda-exp? [exp]
+  (and (= (first exp) 'lambda)
+       (seq? exp)))
+(defn app-exp? [exp]
+  (and (seq? exp)
+       (= (count exp) 2)))
+
+
+(defn var-exp->var [exp] exp)
+(defn lambda-exp->bound-var [exp]
+  (first (second exp)))
+(defn lambda-exp->body [exp]
+  (first (rest (rest exp))))
+(defn app-exp->rator [exp]
+  (first exp))
+(defn app-exp->rand [exp]
+  (second exp))
+
+(defn occurs-free? [search-var exp]
+  (cond (var-exp? exp) (= search-var (var-exp->var exp))
+        (lambda-exp? exp) (and (not (= search-var (lambda-exp->bound-var exp)))
+                               (recur search-var (lambda-exp->body exp)))
+        :else (or (occurs-free? search-var (app-exp->rator exp))
+                  (occurs-free? search-var (app-exp->rand exp)))))
+
+
+;;; ex: 2.16
+
+(defn lambda-exp [var exp]
+  (list 'lambda var exp))
+(defn lambda-exp->bound-var [exp]
+  (second exp))
+
+;;; ex: 2.18
+(defn number->sequence [n]
+  (list n () ()))
+;;; (number->sequence 7)
+
+(defn current-element [[curr front back]]
+  curr)
+;;; (current-element '(6 (5 4 3 2 1) (7 8 9)))
+
+(defn move-to-left [[curr front back]]
+  (list (first front) (rest front) (cons curr back)))
+;;; (move-to-left '(6 (5 4 3 2 1) (7 8 9)))
+
+(defn move-to-right [[curr front back]]
+  (list (first back) (cons curr front) (rest back)))
+;;; (move-to-right '(6 (5 4 3 2 1) (7 8 9)))zo
+(defn insert-to-left [n [curr front back]]
+  (list curr (cons n front) back))
+;;; (insert-to-left 13 '(6 (5 4 3 2 1) (7 8 9)))
+(defn insert-to-right [n [curr front back]]
+  (list curr front (cons n back)))
+;;; (insert-to-right 13 '(6 (5 4 3 2 1) (7 8 9)))
+(defn at-left-end? [[curr front back]]
+  (= () front))
+(defn at-right-end? [[curr front back]]
+  (= () back))
+
+;;; ex: 2.19
+(defn number->bintree [n]
+  (list n '() '()))
+(defn current-element [[n lbt rbt]] n)
+(defn insert-to-left [n [cn lbt rbt]]
+  (list cn (list n lbt ()) rbt))
+(defn insert-to-right [n [cn lbt rbt]]
+  (list  cn lbt (list n () rbt)))
+
+(defn at-leaf? [[cn lbt rbt]]
+  (and (nil? lbt) (nil? rbt)))
+(defn move-to-left [[cn lbt rbt]] lbt)
+(defn move-to-right [[cn lbt rbt]] rbt)
+;;; (number->bintree 13)
+;;; (insert-to-left 15 (insert-to-right 14 (insert-to-left 12 (number->bintree 13))))
+;;; (at-leaf? (move-to-right (move-to-left (insert-to-right 14 (insert-to-left 12 (number->bintree 13))))))
+
+;;; ex: 2.20
+(defn number->bintree [n]
+  (list (list n '() '()) (list '() '() '())))
+(defn current-element [[[n lbt rbt] [rn rlbt rrbt]]]
+  n)
+(defn insert-to-left [n [ [cn lbt rbt] backbt ]]
+  (list
+   (list cn (list n lbt ()) rbt)
+   backbt))
+(defn insert-to-right [n [ [cn lbt rbt] backbt ]]
+  (list
+   (list cn lbt (list n () rbt))
+   backbt))
+
+(defn at-leaf? [[ [cn lbt rbt] [rb rlbt rrbt] ]]
+  (and (nil? lbt) (nil? rbt)))
+(defn move-to-left [[ [cn lbt rbt] [rb rlbt rrbt] ]]
+  (list lbt
+        (list (cons cn rb) (cons () rlbt) (cons rbt rrbt))))
+(defn move-to-right [[ [cn lbt rbt] [rb rlbt rrbt] ]]
+  (list rbt
+        (list (cons cn rb) (cons lbt rlbt) (cons () rrbt))))
+
+(defn move-up [[ cbt [rb rlbt rrbt] ]]
+  (println (first rlbt) (empty? (first rlbt)))
+  (list
+   (if (empty? (first rlbt))
+     (list (first rb) cbt (first rrbt))
+     (list (first rb) (first rlbt) cbt))
+   (list (rest rb) (rest rlbt) (rest rrbt))))
+(defn at-root? [[ [cn lbt rbt] [rb rlbt rrbt] ]])
+
+
+
+;;; ex: 2.21
+
+(ns user (:use define-datatype))
+
+(define-datatype env-exp env-exp?
+  (empty-env)
+  (non-empty-env
+   (var symbol?)
+   (val symbol?)
+   (embed-env env-exp?)))
+
+(defn has-binding? [search-var env]
+  (cases env-exp env
+         (empty-env () false)
+         (non-empty-env (var val embed-env)
+                     (if (= search-var var)
+                       true
+                       (has-binding? search-var embed-env)))))
+
+;;; ex: 2.22
+(define-datatype stack stack?
+  (empty-stack)
+  (push
+   (val #(-> %))
+   (remaining stack?)))
+
+(defn pop [s]
+  (cases stack s
+         (empty-stack () '())
+         (push (val remaining)  remaining)))
+(defn top [s]
+  (cases stack s
+         (empty-stack () '())
+         (push (val _) val)))
+(defn empty-stack? [s]
+  (cases stack s
+         (empty-stack () true)
+         (push (val _) false)))
+
+;;; ex: 2.23
+(defn identifier? [x]
+  (and (not (= 'lambda x)) (symbol? x)))
+(define-datatype lc-exp lc-exp?
+  (var-exp
+   (var identifier?))
+  (lambda-exp
+   (bound-var identifier?)
+   (body lc-exp?))
+  (app-exp
+   (rator lc-exp?)
+   (rand lc-exp?)))
+
+;;; ex: 2.24
+(define-datatype bintree bintree?
+  (leaf-node
+   (num integer?))
+  (interior-node
+   (key symbol?)
+   (left bintree?)
+   (right bintree?)))
+
+(defn bintree-to-list [bt]
+  (cases bintree bt
+         (leaf-node (num) (list 'leaf-node num))
+         (interior-node (key left right) (list 'interior-node key
+                                               (bintree-to-list left)
+                                               (bintree-to-list right)))))
+
+;;; ex: 2.25
+(defn max-interior [bt]
+  (cases bintree bt
+         (leaf-node (num) (list num num 'leaf))
+         (interior-node
+          (key left right)
+          (let [l (max-interior left)
+                r (max-interior right)
+                ln (second l) rn (second r)
+                la (first l) ra (first r)
+                t (+ la ra)
+                mx (max ln rn t)
+                ]
+            (cond
+             (= mx t) (list t t key)
+             (= mx ln) (cons t (rest l))
+             (= mx rn) (cons t (rest r)))))))
+
+;;; ex: 2.26
+(defn list-of [pred]
+  (fn [v]
+    (or (nil? v)
+        (and (seq? v)
+             (pred (first v))
+             ((list-of pred) (rest v))))))
+
+(define-datatype rb-tree rb-tree?
+  (leaf-node
+   (num integer?))
+  (red-node
+   (left rb-tree?)
+   (right rb-tree?))
+  (blue-node
+   (rb-trees (list-of rb-tree?))))
+
+
+;; (run-tests)
+
+
+
 
