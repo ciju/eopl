@@ -432,6 +432,7 @@
 ;;; ex: 2.23
 (defn identifier? [x]
   (and (not (= 'lambda x)) (symbol? x)))
+
 (define-datatype lc-exp lc-exp?
   (var-exp
    (var identifier?))
@@ -479,7 +480,7 @@
 ;;; ex: 2.26
 (defn list-of [pred]
   (fn [v]
-    (or (nil? v)
+    (or (empty? v)
         (and (seq? v)
              (pred (first v))
              ((list-of pred) (rest v))))))
@@ -492,6 +493,69 @@
    (right rb-tree?))
   (blue-node
    (rb-trees (list-of rb-tree?))))
+
+(defn make-red-count-tree [rbt cnt]
+  (cases rb-tree rbt
+         (leaf-node (num)
+                    (leaf-node cnt))
+         (red-node (left right)
+                   (red-node (make-red-count-tree left (+ cnt 1))
+                             (make-red-count-tree right (+ cnt 1))))
+         (blue-node (rb-trees)
+                    (blue-node (map #(-> (make-red-count-tree % cnt)) rb-trees)))))
+
+
+;;; ex: 2.28
+(defn unparse-lc-exp [exp]
+  (cases lc-exp exp
+         (var-exp (var)
+                  (str var))
+         (lambda-exp (bound-var body)
+                     (str "proc " bound-var " => " (unparse-lc-exp body)))
+         (app-exp (rator rand)
+                  (str (unparse-lc-exp rator) "(" (unparse-lc-exp rand) ")"))))
+
+;;; ex: 2.29
+;;; todo: fix the syntax
+(define-datatype lc-*exp lc-*exp?
+  (var-exp* (var identifier?))
+  (lambda-exp*
+   (bound-vars (list-of identifier?))
+   (body lc-*exp?))
+  (app-exp*
+   (rator lc-*exp?)
+   (rand (list-of lc-*exp?))))
+
+
+(defn parse-lc-*exp [datum]
+  (cond
+   (symbol? datum) (var-exp* datum)
+   (seq? datum)
+   (if (= (first datum) 'lambda)
+     (lambda-exp* (second datum) (parse-lc-*exp (second (rest datum))))
+     (app-exp* (parse-lc-*exp (first datum)) (map parse-lc-*exp (rest datum))))))
+
+;;; ex: 2.31
+(define-datatype prefix-exp prefix-exp?
+  (const-exp
+   (num integer?))
+  (diff-exp
+   (operand1 prefix-exp?)
+   (operand2 prefix-exp?)))
+
+(defn diff-exp? [e]
+  (= '- e))
+
+(defn const-exp? [e]
+  (number? e))
+
+(defn gen-prefix-exp [rst]
+  (if (diff-exp? (first rst))
+    (let [[ex-left rst-left] (gen-prefix-exp (rest rst))
+          [ex-right rst-right] (gen-prefix-exp rst-left)]
+      (list (diff-exp ex-left ex-right) rst-right))
+    (list (const-exp (first rst)) (rest rst))))
+
 
 
 ;; (run-tests)
